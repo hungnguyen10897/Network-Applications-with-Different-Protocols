@@ -5,13 +5,17 @@ import h2.connection
 import h2.events
 import h2.config
 
-from logic import get_region_json_map
+from logic import get_region_json_map, parse_gps
 
 def send_response(conn, event):
     stream_id = event.stream_id
-    gps = dict(event.headers)["gps"]
+    gps_str = dict(event.headers)["gps"]
+    gps_locs = parse_gps(gps_str)
 
-    response_data = json.dumps(get_region_json_map(gps)).encode('utf-8')
+    # Immediately respond with map of the first GPS location
+    response_data = json.dumps(
+        get_region_json_map(gps_locs[0])
+        ).encode('utf-8')
 
     conn.send_headers(
         stream_id=stream_id,
@@ -27,6 +31,11 @@ def send_response(conn, event):
         data=response_data,
         end_stream=True
     )
+
+    # Sequence of GPS locations
+    if len(gps_locs) > 1:
+        pass
+    
 
 def handle(sock):
     config = h2.config.H2Configuration(client_side=False)
