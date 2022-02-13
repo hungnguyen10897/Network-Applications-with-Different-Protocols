@@ -4,10 +4,25 @@ from hyper import HTTP20Connection
 from logic import get_gps_str, route, get_region
 
 
-speed = 1 # (gps/s)
-trace = route[1:90]
-# trace.reverse()
+# Invalid GPS
+# trace = [[121212, 24.927370699999997]]
 
+# Invalid GPS
+# trace = route[80:98] + [[121212, 24.927370699999997]]
+
+# Espoo -> Helsinki -> Espoo
+# trace2 = route[80:98]
+# trace2.reverse()
+# trace = route[80:98] + trace2
+
+# Helsinki -> Espoo
+trace = route[80:98]
+trace.reverse()
+
+# Espoo -> Helsinki
+# trace = route[80:98]
+
+speed = 1 # (gps/s)
 trace_header = ";".join(list(map(lambda gps: get_gps_str(gps), trace)))
 
 if __name__ == "__main__":
@@ -16,11 +31,17 @@ if __name__ == "__main__":
 
     req = c.request('GET', '/', headers={ 'gps' : trace_header})
     res = c.get_response()
-    pushes = c.get_pushes()
 
     if not res:
         print("No response from server.")
-        sys.exit(0)
+        sys.exit(1)
+
+    if res.status != 200:
+        message = res.read().decode("utf-8")
+        print(f"Status code: {res.status} returned from server - Message: {message}")
+        sys.exit(1)
+
+    pushes = c.get_pushes()
 
     start_gps = trace[0]
     start_region = get_region(start_gps)

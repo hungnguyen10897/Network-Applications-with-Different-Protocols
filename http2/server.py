@@ -53,18 +53,26 @@ def send_response(conn, event):
     gps_str = dict(event.headers)["gps"]
     regions = analyze_route(gps_str)
 
-    if len(regions) > 1:
-        send_push(conn,event, regions)
+    if regions is None:
+        status_code = 400
+        response_data = json.dumps('Invalid GPS Header').encode('utf-8')
 
-    # Immediately respond with map of the first GPS location
-    response_data = json.dumps(
-        get_region_json_map(regions[0])
-        ).encode('utf-8')
+    else:
+        # Immediately respond with map of the first GPS location
+        map = get_region_json_map(regions[0])
+        if map is None:
+            status_code = 404
+            response_data = json.dumps(f'Map for region {regions[0].upper()} not Found').encode('utf-8')
+        else:
+            if len(regions) > 1:
+                send_push(conn,event, regions)
+            status_code = 200
+            response_data = json.dumps(map).encode('utf-8')
 
     conn.send_headers(
         stream_id=stream_id,
         headers=[
-            (':status', '200'),
+            (':status', str(status_code)),
             ('server', 'basic-h2-server/1.0'),
             ('content-length', str(len(response_data))),
             ('content-type', 'application/json'),
