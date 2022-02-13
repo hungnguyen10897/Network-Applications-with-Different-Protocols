@@ -5,16 +5,60 @@ import h2.connection
 import h2.events
 import h2.config
 
-from logic import get_region_json_map, parse_gps
+from logic import analyze_route, get_region_json_map
+
+
+def send_push(conn, event, regions):
+    for region in regions[1:]:
+        print(f"Sending PUSH for region {region.upper()}")
+        push_id=conn.get_next_available_stream_id()
+
+        # push_headers = []
+
+        # for header in event.headers:
+        #     if "gps" in header:
+        #         header = ('gps', get_city_first_gps('espoo'))
+        #     push_headers.append(header)
+
+        conn.push_stream(
+            stream_id=event.stream_id,
+            promised_stream_id=push_id,
+            request_headers=event.headers
+        )
+
+        response_data = json.dumps(
+            get_region_json_map(region)
+        ).encode('utf-8')
+
+        conn.send_headers(
+            stream_id=push_id,
+            headers=[
+                (':status', '200'),
+                ('server', 'basic-h2-server/1.0'),
+                ('content-length', str(len(response_data))),
+                ('content-type', 'application/json'),
+            ],
+        )
+
+        # Single GPS location
+        conn.send_data(
+            stream_id=push_id,
+            data=response_data,
+            end_stream=True
+        )
+
 
 def send_response(conn, event):
     stream_id = event.stream_id
     gps_str = dict(event.headers)["gps"]
-    gps_locs = parse_gps(gps_str)
+    regions = analyze_route(gps_str)
+
+    if len(regions) > 1:
+        send_push(conn,event, regions)
 
     # Immediately respond with map of the first GPS location
     response_data = json.dumps(
-        get_region_json_map(gps_locs[0])
+        get_region_json_map(regions[0])
         ).encode('utf-8')
 
     conn.send_headers(
@@ -26,16 +70,14 @@ def send_response(conn, event):
             ('content-type', 'application/json'),
         ],
     )
+
+    # Single GPS location
     conn.send_data(
         stream_id=stream_id,
         data=response_data,
         end_stream=True
     )
 
-    # Sequence of GPS locations
-    if len(gps_locs) > 1:
-        pass
-    
 
 def handle(sock):
     config = h2.config.H2Configuration(client_side=False)
@@ -50,6 +92,7 @@ def handle(sock):
 
         events = conn.receive_data(data)
         for event in events:
+            print(event)
             if isinstance(event, h2.events.RequestReceived):
                 send_response(conn, event)
 
@@ -57,11 +100,13 @@ def handle(sock):
         if data_to_send:
             sock.sendall(data_to_send)
 
-sock = socket.socket()
-sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.bind(('0.0.0.0', 8080))
-sock.listen(5)
 
-while True:
-    handle(sock.accept()[0])
+if __name__ == "__main__":
+    sock = socket.socket()
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(('0.0.0.0', 8080))
+    sock.listen(5)
+
+    while True:
+        handle(sock.accept()[0])
     
