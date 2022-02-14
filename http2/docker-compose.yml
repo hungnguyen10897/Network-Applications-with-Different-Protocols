@@ -1,0 +1,8 @@
+version: "3.9"
+   
+services:
+  project:
+    build: .
+    volumes:
+      - .:/app
+    command: /bin/bash
