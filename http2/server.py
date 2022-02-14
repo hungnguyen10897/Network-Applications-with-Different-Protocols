@@ -50,8 +50,10 @@ def send_push(conn, event, regions):
 
 def send_response(conn, event):
     stream_id = event.stream_id
-    gps_str = dict(event.headers)["gps"]
-    regions = analyze_route(gps_str)
+    print(dict(event.headers))
+    gps_str = dict(event.headers)[b'gps']
+    print("gps_str: ", gps_str)
+    regions = analyze_route(gps_str.decode("utf-8"))
 
     if regions is None:
         status_code = 400
