@@ -47,10 +47,8 @@ def send_push(conn, event, regions):
             end_stream=True
         )
 
-
-def send_response(conn, event):
+def handle_get_map_response(conn, event):
     stream_id = event.stream_id
-    print(dict(event.headers))
     gps_str = dict(event.headers)[b'gps']
     print("gps_str: ", gps_str)
     regions = analyze_route(gps_str.decode("utf-8"))
@@ -87,6 +85,14 @@ def send_response(conn, event):
         data=response_data,
         end_stream=True
     )
+
+def send_response(conn, event):
+    print(dict(event.headers))
+
+    request_type = dict(event.headers)[b'type'].decode("utf-8")
+
+    if request_type == 'get_map':
+        handle_get_map_response(conn, event)
 
 
 def handle(sock):

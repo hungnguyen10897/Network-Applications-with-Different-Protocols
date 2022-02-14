@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     c = HTTP20Connection('localhost:8080', enable_push=True)
 
-    req = c.request('GET', '/', headers={ 'gps' : trace_header})
+    req = c.request('GET', '/', headers={ 'type': 'get_map', 'gps' : trace_header})
     res = c.get_response()
 
     if not res:
