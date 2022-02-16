@@ -1,5 +1,6 @@
 import sys
 import time
+import os
 from hyper import HTTP20Connection
 from logic import get_gps_str, route, get_region
 
@@ -15,8 +16,11 @@ from logic import get_gps_str, route, get_region
 # trace2.reverse()
 # trace = route[80:98] + trace2
 
+start_trace_index = 80
+end_trace_index = 98
+
 # Helsinki -> Espoo
-trace = route[80:98]
+trace = route[start_trace_index:end_trace_index]
 trace.reverse()
 
 # Espoo -> Helsinki
@@ -24,6 +28,18 @@ trace.reverse()
 
 speed = 1 # (gps/s)
 trace_header = ";".join(list(map(lambda gps: get_gps_str(gps), trace)))
+
+def send_photo_with_gps(conn, gps_index):
+    print(f"Sending photo for {get_gps_str(gps)}")
+    image_path = f"./trace/images/gsv_{gps_index}.jpg"
+    image_size = os.path.getsize(image_path)
+    print(f"image_size: {image_size}")
+    image_file = open(image_path, "rb")
+    req = c.request('POST', '/', body=image_file, headers={ 'type': 'put_image', 'gps' : trace_header, 'Content-Length': image_size})
+    res = c.get_response()
+    print(res.read())
+    image_file.close()
+
 
 if __name__ == "__main__":
 
@@ -53,10 +69,13 @@ if __name__ == "__main__":
 
     region = get_region(start_gps)
 
-    for gps in trace[1:]:
+    for (index, gps) in enumerate(trace[1:]):
         
         current_region = get_region(gps)
         print(f"\nAt GPS: {get_gps_str(gps)}")
+
+        gps_index = start_trace_index + index
+        send_photo_with_gps(c, gps_index)
 
         if current_region != region:
             push = pushes.__next__()
@@ -66,3 +85,5 @@ if __name__ == "__main__":
             region = current_region
             
         time.sleep(speed)
+        # Uncomment when testing with one request
+        #break

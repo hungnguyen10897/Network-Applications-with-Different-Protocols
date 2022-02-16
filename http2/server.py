@@ -86,13 +86,30 @@ def handle_get_map_response(conn, event):
         end_stream=True
     )
 
-def send_response(conn, event):
-    print(dict(event.headers))
+pending_stream_file_buffer = 0
 
+def handle_put_image_response(conn, event):
+    global pending_stream_file_buffer
+    stream_id = event.stream_id
+    print(f"Received put image response for stream id {stream_id}, size {event.flow_controlled_length}")
+    pending_stream_file_buffer += event.flow_controlled_length
+    
+def finish_file_upload(conn, event):
+    global pending_stream_file_buffer
+    # push_id=conn.get_next_available_stream_id()
+    print(f"Finishing file upload for stream {event.stream_id}")
+    conn.acknowledge_received_data(pending_stream_file_buffer, event.stream_id)
+    pending_stream_file_buffer = 0
+
+
+def send_response(conn, event):
     request_type = dict(event.headers)[b'type'].decode("utf-8")
 
     if request_type == 'get_map':
         handle_get_map_response(conn, event)
+
+    if request_type == 'put_image':
+        print(f"Received put image request for stream id {event.stream_id}")
 
 
 def handle(sock):
@@ -111,6 +128,10 @@ def handle(sock):
             print(event)
             if isinstance(event, h2.events.RequestReceived):
                 send_response(conn, event)
+            if isinstance(event, h2.events.DataReceived):
+                handle_put_image_response(conn, event)
+            if isinstance(event, h2.events.StreamEnded):
+                finish_file_upload(conn, event)
 
         data_to_send = conn.data_to_send()
         if data_to_send:
